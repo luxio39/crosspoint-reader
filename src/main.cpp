@@ -38,6 +38,7 @@
 #include "images/LoadingIcon.h"
 #include "platform/UsbSerialJtagHandoff.h"
 #include "util/ButtonNavigator.h"
+#include "util/ReadingTracker.h"
 #include "util/ScreenshotUtil.h"
 #include "util/Timezones.h"
 
@@ -262,6 +263,9 @@ static bool loadSleepFrameBuffer() {
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout = false) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
+
+  ReadingTracker::logEvent(fromTimeout ? TrackingEvent::SLEEP_TIMEOUT : TrackingEvent::SLEEP_BUTTON);
+
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
 
   const bool isQuickResumeSleep =
@@ -411,6 +415,8 @@ void setup() {
     activityManager.goToFullScreenMessage("SD card error", EpdFontFamily::BOLD);
     return;
   }
+
+  ReadingTracker::init();
 
   HalSystem::checkPanic();
 
