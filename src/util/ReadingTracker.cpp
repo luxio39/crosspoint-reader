@@ -4,7 +4,8 @@
 #include <Logging.h>
 #include <fcntl.h>
 #include <string.h>
-#include <time.h>
+
+#include "HalClock.h"
 
 const std::string STATS_FILE_PATH = "/.crosspoint/reading_sessions.csv";
 
@@ -21,7 +22,8 @@ void ReadingTracker::init() {
   if (!Storage.exists(STATS_FILE_PATH.c_str())) {
     HalFile file;
     if (Storage.openFileForWrite("TRK", STATS_FILE_PATH, file)) {
-      const char* header = "TIMESTAMP,EVENT_TYPE,BOOK_PATH,SPINE_INDEX,SPINE_OFFSET\n";
+      const char* header =
+          "TIMESTAMP,EVENT_TYPE,BOOK_PATH,SPINE_INDEX,CHAPTER_PAGE_NUMBER,CHAPTER_TOTAL_PAGES,SPINE_OFFSET\n";
       file.write(header, strlen(header));
       file.close();
       LOG_INF("TRK", "Created new reading stats CSV at: %s", STATS_FILE_PATH.c_str());
@@ -29,7 +31,13 @@ void ReadingTracker::init() {
   }
 }
 
-void ReadingTracker::logEvent(TrackingEvent event, uint32_t spineIndex, uint32_t spineOffset, const char* bookPath) {
+void ReadingTracker::logEvent(TrackingEvent event, uint32_t spineIndex, uint32_t chapterPageNumber,
+                              uint32_t chapterTotalPages, uint32_t spineOffset, const char* bookPath) {
+  time_t timestamp;
+  if (!halClock.utcTime(timestamp)) {
+    timestamp = time(nullptr);
+  }
+
   if (event == TrackingEvent::BOOK_OPEN && bookPath != nullptr) {
     strncpy(currentBookPath, bookPath, sizeof(currentBookPath) - 1);
     currentBookPath[sizeof(currentBookPath) - 1] = '\0';
@@ -42,9 +50,11 @@ void ReadingTracker::logEvent(TrackingEvent event, uint32_t spineIndex, uint32_t
   }
 
   TrackingLogEntry& entry = eventBuffer[bufferCount];
-  entry.timestamp = (uint32_t)time(NULL);
+  entry.timestamp = timestamp;
   entry.eventType = event;
   entry.spineIndex = spineIndex;
+  entry.chapterPageNumber = chapterPageNumber;
+  entry.chapterTotalPages = chapterTotalPages;
   entry.spineOffset = spineOffset;
 
   strncpy(entry.bookPath, currentBookPath, sizeof(entry.bookPath));
@@ -79,10 +89,11 @@ void ReadingTracker::flushToSD() {
 
   char lineBuffer[256];
   for (uint8_t i = 0; i < bufferCount; i++) {
-    int len =
-        snprintf(lineBuffer, sizeof(lineBuffer), "%lu,%u,\"%s\",%lu,%lu\n", (unsigned long)eventBuffer[i].timestamp,
-                 (unsigned int)eventBuffer[i].eventType, eventBuffer[i].bookPath,
-                 (unsigned long)eventBuffer[i].spineIndex, (unsigned long)eventBuffer[i].spineOffset);
+    int len = snprintf(lineBuffer, sizeof(lineBuffer), "%lu,%u,\"%s\",%lu,%lu,%lu,%lu\n",
+                       (unsigned long)eventBuffer[i].timestamp, (unsigned int)eventBuffer[i].eventType,
+                       eventBuffer[i].bookPath, (unsigned long)eventBuffer[i].spineIndex,
+                       (unsigned long)eventBuffer[i].chapterPageNumber, (unsigned long)eventBuffer[i].chapterTotalPages,
+                       (unsigned long)eventBuffer[i].spineOffset);
 
     if (len > 0 && len < sizeof(lineBuffer)) {
       file.write((const uint8_t*)lineBuffer, (size_t)len);

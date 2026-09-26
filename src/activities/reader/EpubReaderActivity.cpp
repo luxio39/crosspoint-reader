@@ -241,8 +241,10 @@ bool EpubReaderActivity::loadBook() {
   loadCachedBookmarks();
 
   CrossPointPosition localPos = getCurrentPosition();
-  ReadingTracker::logEvent(TrackingEvent::BOOK_OPEN, localPos.spineIndex, localPos.visibleTextOffset,
-                           epub->getPath().c_str());
+  uint32_t passed_offset =
+      localPos.visibleTextOffset != 0 ? localPos.visibleTextOffset : cachedVisibleTextOffset.value_or(0);
+  ReadingTracker::logEvent(TrackingEvent::BOOK_OPEN, localPos.spineIndex, localPos.pageNumber, localPos.totalPages,
+                           passed_offset, epub->getPath().c_str());
 
   return true;
 }
@@ -340,7 +342,8 @@ void EpubReaderActivity::openDictionaryWordSelect() {
 
 void EpubReaderActivity::onExit() {
   CrossPointPosition localPos = getCurrentPosition();
-  ReadingTracker::logEvent(TrackingEvent::BOOK_CLOSE, localPos.spineIndex, localPos.visibleTextOffset);
+  ReadingTracker::logEvent(TrackingEvent::BOOK_CLOSE, localPos.spineIndex, localPos.pageNumber, localPos.totalPages,
+                           localPos.visibleTextOffset);
   ReaderActivity::onExit();
 }
 
@@ -1528,7 +1531,7 @@ bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
     offset = (currentPage == section->currentPage && currentPageVisibleOffset.has_value())
                  ? currentPageVisibleOffset
                  : section->getVisibleTextOffsetForPage(static_cast<uint16_t>(currentPage));
-    ReadingTracker::logEvent(TrackingEvent::PROGRESS_UPDATE, spineIndex, offset.value());
+    ReadingTracker::logEvent(TrackingEvent::PROGRESS_UPDATE, spineIndex, currentPage, pageCount, offset.value());
   }
   return EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, offset);
 }

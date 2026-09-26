@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <time.h>
 
 enum class TrackingEvent : uint8_t {
   BOOK_OPEN = 0,
@@ -11,9 +12,11 @@ enum class TrackingEvent : uint8_t {
 };
 
 struct TrackingLogEntry {
-  uint32_t timestamp;
+  time_t timestamp;
   TrackingEvent eventType;
   uint32_t spineIndex;
+  uint32_t chapterPageNumber;
+  uint32_t chapterTotalPages;
   uint32_t spineOffset;
   char bookPath[128];
 };
@@ -21,8 +24,8 @@ struct TrackingLogEntry {
 class ReadingTracker {
  public:
   static void init();
-  static void logEvent(TrackingEvent event, uint32_t spineIndex = 0, uint32_t spineOffset = 0,
-                       const char* bookPath = nullptr);
+  static void logEvent(TrackingEvent event, uint32_t spineIndex = 0, uint32_t chapterPageNumber = 0,
+                       uint32_t chapterTotalPages = 0, uint32_t spineOffset = 0, const char* bookPath = nullptr);
 
  private:
   static void flushToSD();
